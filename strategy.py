@@ -3,21 +3,30 @@ from utils import calculate_ema, calculate_rsi, calculate_avg_volume
 
 def analyze_stock(df: pd.DataFrame):
     try:
+        # Calculate indicators
         df = calculate_ema(df, period=50)
         df = calculate_rsi(df, period=14)
         df = calculate_avg_volume(df, window=10)
     except Exception as e:
         raise ValueError(f"Error during indicator calculation: {e}")
 
-    # Check if all required columns exist
+    # Check for required columns and valid data
     required_cols = ['EMA50', 'RSI', '10_avg_vol', 'Close', 'Volume']
-    missing = [col for col in required_cols if col not in df.columns or df[col].isna().all()]
-    if missing:
+    missing = []
+    for col in required_cols:
+        if col not in df.columns:
+            missing.append(col)
+        elif df[col].isna().all():
+            missing.append(col)
+
+    if len(missing) > 0:
         raise ValueError(f"Missing or invalid data in columns: {missing}")
 
+    # Drop rows with NaN values in important columns
     df = df.dropna(subset=required_cols)
 
     signals = []
+
     for i in range(1, len(df)):
         price = df['Close'].iloc[i]
         ema = df['EMA50'].iloc[i]
@@ -26,9 +35,12 @@ def analyze_stock(df: pd.DataFrame):
         avg_vol = df['10_avg_vol'].iloc[i]
         prev_price = df['Close'].iloc[i - 1]
 
+        # Buy condition
         if (
-            price > ema and rsi < 70 and
-            volume > 1.5 * avg_vol and price > prev_price
+            price > ema and
+            rsi < 70 and
+            volume > 1.5 * avg_vol and
+            price > prev_price
         ):
             signals.append({
                 'Index': df.index[i],
@@ -37,9 +49,13 @@ def analyze_stock(df: pd.DataFrame):
                 'RSI': rsi,
                 'Volume': volume
             })
+
+        # Sell condition
         elif (
-            price < ema and rsi > 30 and
-            volume > 1.5 * avg_vol and price < prev_price
+            price < ema and
+            rsi > 30 and
+            volume > 1.5 * avg_vol and
+            price < prev_price
         ):
             signals.append({
                 'Index': df.index[i],
