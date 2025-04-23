@@ -1,5 +1,34 @@
-# Sidebar run button
-run_analysis = st.sidebar.button("🚀 Run Strategy")
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import plotly.graph_objs as go
+from strategy import analyze_stock
+
+st.set_page_config(page_title="📊 Volume Price Action Strategy", layout="wide")
+st.title("📈 Volume Price Action Strategy for Indian Markets")
+
+# Sidebar section
+with st.sidebar:
+    st.header("📌 Stock Selection")
+    ticker = st.text_input("Enter NSE stock ticker (e.g., RELIANCE.NS)", value="RELIANCE.NS")
+    start_date = st.date_input("Start Date", pd.to_datetime("2023-01-01"))
+    end_date = st.date_input("End Date", pd.to_datetime("today"))
+    run_analysis = st.button("🚀 Run Strategy")
+
+# Function to load extended data for indicators
+@st.cache_data
+def load_data(ticker, user_start, user_end):
+    # Pull at least 6 months before user start for indicators like EMA50, RSI
+    buffer_days = 180
+    hist_start = user_start - pd.Timedelta(days=buffer_days)
+    try:
+        df = yf.download(ticker, start=hist_start, end=user_end)
+        if df.empty:
+            raise ValueError("Downloaded data is empty.")
+        return df
+    except Exception as e:
+        st.error(f"❌ Failed to download data: {e}")
+        return pd.DataFrame()
 
 # Load data
 df = load_data(ticker, start_date, end_date)
