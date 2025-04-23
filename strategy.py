@@ -2,17 +2,23 @@ from utils import preprocess_data
 import pandas as pd
 
 def analyze_stock(df):
-    # Preprocess the DataFrame to add indicators
     df = preprocess_data(df)
 
-    # Ensure required columns are clean (no NaNs)
-    df = df.dropna(subset=['EMA50', 'RSI', '10_avg_vol', 'High', 'Low', 'Close', 'Volume'])
+    required_cols = ['EMA50', 'RSI', '10_avg_vol', 'High', 'Low', 'Close', 'Volume']
+
+    # Check if all required columns are present
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        raise KeyError(f"Missing required columns in DataFrame: {missing_cols}")
+
+    # Drop rows with NaN in key columns
+    df = df.dropna(subset=required_cols)
 
     signals = []
 
     for i in range(1, len(df)):
         try:
-            # Bullish breakout condition
+            # Bullish breakout
             if (
                 df['Close'].iloc[i] > df['EMA50'].iloc[i]
                 and df['Volume'].iloc[i] > 1.5 * df['10_avg_vol'].iloc[i]
@@ -25,7 +31,7 @@ def analyze_stock(df):
                     'Close': df['Close'].iloc[i]
                 })
 
-            # Bearish breakdown condition
+            # Bearish breakdown
             elif (
                 df['Close'].iloc[i] < df['EMA50'].iloc[i]
                 and df['Volume'].iloc[i] > 1.5 * df['10_avg_vol'].iloc[i]
@@ -39,7 +45,6 @@ def analyze_stock(df):
                 })
 
         except Exception as e:
-            # In case of any edge case errors (e.g., NaNs that sneak through)
             print(f"Skipping index {i} due to error: {e}")
 
     signals_df = pd.DataFrame(signals)
