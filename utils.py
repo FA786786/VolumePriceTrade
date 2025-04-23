@@ -3,29 +3,31 @@ import numpy as np
 
 def compute_rsi(series, period=14):
     delta = series.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-    rs = gain / loss
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    avg_gain = gain.rolling(window=period).mean()
+    avg_loss = loss.rolling(window=period).mean()
+
+    rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
 def preprocess_data(df):
     df = df.copy()
 
-    # Ensure necessary columns exist
-    if 'Close' not in df or 'Volume' not in df or 'High' not in df or 'Low' not in df:
-        raise ValueError("Missing required OHLCV columns in the input DataFrame.")
+    # Ensure DataFrame has the basic required columns
+    required_cols = ['Close', 'Volume', 'High', 'Low']
+    for col in required_cols:
+        if col not in df.columns:
+            raise KeyError(f"Missing column: {col}")
 
-    # EMA50
+    # Calculate indicators
     df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
-
-    # 10-day average volume
     df['10_avg_vol'] = df['Volume'].rolling(window=10).mean()
-
-    # RSI
     df['RSI'] = compute_rsi(df['Close'])
 
-    # Drop rows with NaNs in the calculated columns
+    # Drop rows with NaNs in newly created columns
     df.dropna(subset=['EMA50', '10_avg_vol', 'RSI'], inplace=True)
 
     return df
