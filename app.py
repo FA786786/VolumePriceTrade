@@ -1,88 +1,39 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import plotly.graph_objs as go
 from strategy import analyze_stock
 
-st.set_page_config(page_title="📊 Volume Price Action Strategy", layout="wide")
-st.title("📈 Volume Price Action Strategy for Indian Markets")
+st.set_page_config(page_title="📈 Volume Price Strategy", layout="wide")
 
-# Sidebar section
-with st.sidebar:
-    st.header("📌 Stock Selection")
-    ticker = st.text_input("Enter NSE stock ticker (e.g., RELIANCE.NS)", value="RELIANCE.NS")
-    start_date = st.date_input("Start Date", pd.to_datetime("2023-01-01"))
-    end_date = st.date_input("End Date", pd.to_datetime("today"))
-    run_analysis = st.button("🚀 Run Strategy")
+st.title("📊 Volume & Price Strategy — Indian Stocks")
+st.markdown("Analyze NSE stocks using a volume-price based strategy.")
 
-# Function to load extended data for indicators
-@st.cache_data
-def load_data(ticker, user_start, user_end):
-    # Pull at least 6 months before user start for indicators like EMA50, RSI
-    buffer_days = 180
-    hist_start = user_start - pd.Timedelta(days=buffer_days)
-    try:
-        df = yf.download(ticker, start=hist_start, end=user_end)
-        if df.empty:
-            raise ValueError("Downloaded data is empty.")
-        return df
-    except Exception as e:
-        st.error(f"❌ Failed to download data: {e}")
-        return pd.DataFrame()
+# Sidebar input
+ticker = st.sidebar.text_input("Enter NSE Stock Symbol", value="RELIANCE.NS")
+start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2022-01-01"))
+end_date = st.sidebar.date_input("End Date", pd.to_datetime("today"))
+run_analysis = st.sidebar.button("🚀 Run Strategy")
 
-# Load data
-df = load_data(ticker, start_date, end_date)
-
-# Ensure enough data exists
-if df.empty or df.shape[0] < 60:
-    st.warning("⚠️ Not enough data. Try a different ticker or wider date range.")
-    st.stop()
-
-# Only run analysis if button clicked
 if run_analysis:
     try:
-        result_df, signals_df = analyze_stock(df)
+        # Pull data
+        st.write(f"Fetching data for: **{ticker}**")
+        df = yf.download(ticker, start=start_date, end=end_date)
 
-        # Filter signals within user-selected date range
-        signals_df = signals_df[signals_df['Index'] >= pd.to_datetime(start_date)]
+        if df.empty:
+            st.error("⚠️ No data found for the selected ticker and time period.")
+        else:
+            # Run strategy
+            df_result, signals_df = analyze_stock(df)
 
-        # Chart
-        st.subheader("📊 Price Action with Buy/Sell Signals")
+            st.subheader("📈 Stock Price & Indicators")
+            st.line_chart(df_result[['Close']])
 
-        fig = go.Figure()
-
-        fig.add_trace(go.Candlestick(
-            x=result_df.index,
-            open=result_df['Open'],
-            high=result_df['High'],
-            low=result_df['Low'],
-            close=result_df['Close'],
-            name='Candlesticks'
-        ))
-
-        for _, row in signals_df.iterrows():
-            color = 'green' if row['Signal'] == 'Buy' else 'red'
-            fig.add_trace(go.Scatter(
-                x=[row['Index']],
-                y=[row['Close']],
-                mode='markers+text',
-                marker=dict(color=color, size=10),
-                name=row['Signal'],
-                text=row['Signal'],
-                textposition="top center"
-            ))
-
-        fig.update_layout(
-            xaxis_rangeslider_visible=False,
-            template='plotly_dark',
-            height=600
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Signal table
-        st.subheader("📝 Trade Signals")
-        st.dataframe(signals_df[['Index', 'Signal', 'Close', 'RSI', 'Volume']])
+            st.subheader("🪙 Buy/Sell Signals")
+            if signals_df.empty:
+                st.info("No buy/sell signals for this period.")
+            else:
+                st.dataframe(signals_df)
 
     except Exception as e:
-        st.error(f"🚫 Error while analyzing stock: {e}")
+        st.error(f"❌ Error while analyzing stock: {e}")
