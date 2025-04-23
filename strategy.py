@@ -2,31 +2,33 @@ import pandas as pd
 from utils import calculate_ema, calculate_rsi, calculate_avg_volume
 
 def analyze_stock(df: pd.DataFrame):
-    # Calculate indicators
-    df = calculate_ema(df, period=50)
-    df = calculate_rsi(df, period=14)
-    df = calculate_avg_volume(df, window=10)
+    try:
+        df = calculate_ema(df, period=50)
+        df = calculate_rsi(df, period=14)
+        df = calculate_avg_volume(df, window=10)
+    except Exception as e:
+        raise ValueError(f"Error during indicator calculation: {e}")
 
-    # Clean data
-    df.dropna(subset=['EMA50', 'RSI', '10_avg_vol', 'Close', 'Volume'], inplace=True)
+    # Check if all required columns exist
+    required_cols = ['EMA50', 'RSI', '10_avg_vol', 'Close', 'Volume']
+    missing = [col for col in required_cols if col not in df.columns or df[col].isna().all()]
+    if missing:
+        raise ValueError(f"Missing or invalid data in columns: {missing}")
+
+    df = df.dropna(subset=required_cols)
 
     signals = []
-
     for i in range(1, len(df)):
         price = df['Close'].iloc[i]
         ema = df['EMA50'].iloc[i]
         rsi = df['RSI'].iloc[i]
         volume = df['Volume'].iloc[i]
         avg_vol = df['10_avg_vol'].iloc[i]
-
         prev_price = df['Close'].iloc[i - 1]
 
-        # Buy Signal Logic
         if (
-            price > ema and
-            rsi < 70 and
-            volume > 1.5 * avg_vol and
-            price > prev_price
+            price > ema and rsi < 70 and
+            volume > 1.5 * avg_vol and price > prev_price
         ):
             signals.append({
                 'Index': df.index[i],
@@ -35,13 +37,9 @@ def analyze_stock(df: pd.DataFrame):
                 'RSI': rsi,
                 'Volume': volume
             })
-
-        # Sell Signal Logic
         elif (
-            price < ema and
-            rsi > 30 and
-            volume > 1.5 * avg_vol and
-            price < prev_price
+            price < ema and rsi > 30 and
+            volume > 1.5 * avg_vol and price < prev_price
         ):
             signals.append({
                 'Index': df.index[i],
