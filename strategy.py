@@ -1,24 +1,24 @@
-import pandas as pd
+from utils import preprocess_data
 
 def analyze_stock(df):
-    df['10_avg_vol'] = df['Volume'].rolling(window=10).mean()
-    df['RSI'] = df['Close'].rolling(window=14).mean()  # Replace with actual RSI logic
-    df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
+    df = preprocess_data(df)
 
     signals = []
     for i in range(1, len(df)):
         if (
-            df['Close'][i] > df['EMA50'][i]
-            and df['Volume'][i] > 1.5 * df['10_avg_vol'][i]
-            and df['Close'][i] > df['High'][i-1]
+            df['Close'].iloc[i] > df['EMA50'].iloc[i]
+            and df['Volume'].iloc[i] > 1.5 * df['10_avg_vol'].iloc[i]
+            and df['Close'].iloc[i] > df['High'].iloc[i - 1]
+            and 55 <= df['RSI'].iloc[i] <= 65
         ):
-            signals.append({'Index': df.index[i], 'Signal': 'Buy', 'Close': df['Close'][i]})
+            signals.append({'Index': df.index[i], 'Signal': 'Buy', 'Close': df['Close'].iloc[i]})
         elif (
-            df['Close'][i] < df['EMA50'][i]
-            and df['Volume'][i] > 1.5 * df['10_avg_vol'][i]
-            and df['Close'][i] < df['Low'][i-1]
+            df['Close'].iloc[i] < df['EMA50'].iloc[i]
+            and df['Volume'].iloc[i] > 1.5 * df['10_avg_vol'].iloc[i]
+            and df['Close'].iloc[i] < df['Low'].iloc[i - 1]
+            and df['RSI'].iloc[i] < 45
         ):
-            signals.append({'Index': df.index[i], 'Signal': 'Sell', 'Close': df['Close'][i]})
+            signals.append({'Index': df.index[i], 'Signal': 'Sell', 'Close': df['Close'].iloc[i]})
 
     signals_df = pd.DataFrame(signals)
     return df, signals_df
