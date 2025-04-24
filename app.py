@@ -52,3 +52,5 @@ else:
 # Debug
 with st.expander("🛠 Full Data (Debug Info)"):
     st.dataframe(df)
+    streamlit run app.py
+
