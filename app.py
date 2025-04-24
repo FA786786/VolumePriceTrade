@@ -18,18 +18,20 @@ results = []
 for ticker in nifty_stocks:
     try:
         df = yf.download(ticker, period="6mo", interval="1d")
-        if df.empty:
+        if df.empty or len(df) < 200:
             continue
 
         df.dropna(inplace=True)
 
-        # Calculate indicators
-        df['EMA50'] = ta.trend.EMAIndicator(df['Close'], window=50).ema_indicator().squeeze()
-        df['EMA200'] = ta.trend.EMAIndicator(df['Close'], window=200).ema_indicator().squeeze()
-        df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi().squeeze()
+        # Indicator calculations with proper flattening
+        df['EMA50'] = ta.trend.EMAIndicator(df['Close'], window=50).ema_indicator().to_numpy().flatten()
+        df['EMA200'] = ta.trend.EMAIndicator(df['Close'], window=200).ema_indicator().to_numpy().flatten()
+        df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi().to_numpy().flatten()
         df['VolumeSMA'] = df['Volume'].rolling(window=20).mean()
 
-        # Latest row
+        # Drop NaNs created by indicators
+        df.dropna(inplace=True)
+
         latest = df.iloc[-1]
 
         # Conditions
@@ -50,7 +52,7 @@ for ticker in nifty_stocks:
     except Exception as e:
         st.warning(f"{ticker} error: {e}")
 
-# Display results
+# Show results
 st.markdown("## 📈 Screener Results")
 if results:
     st.dataframe(pd.DataFrame(results))
