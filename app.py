@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
 
-# === CONFIGURATION ===
+# === STREAMLIT PAGE CONFIG ===
 st.set_page_config(page_title="BankNifty Volume Buy/Sell", layout="wide")
 
 # === PARAMETERS ===
 VOLUME_THRESHOLD = 19880
 
 # === SAMPLE OHLCV DATA ===
-# You can replace this with your own data from a CSV, API, etc.
 data = {
     'open': [100, 102, 101, 105, 108, 107],
     'high': [105, 106, 103, 110, 112, 110],
@@ -18,7 +17,7 @@ data = {
 }
 df = pd.DataFrame(data)
 
-# === LOGIC ===
+# === SIGNAL LOGIC ===
 df['is_bullish'] = df['close'] > df['open']
 df['is_bearish'] = df['close'] < df['open']
 df['is_high_volume'] = df['volume'] >= VOLUME_THRESHOLD
@@ -29,28 +28,26 @@ df['sell_signal'] = df['is_bearish'] & df['is_high_volume']
 # === STREAMLIT UI ===
 st.title("📈 BankNifty Volume Buy/Sell Signal (19880+)")
 
-# Chart
+# Price Chart
 st.subheader("🔹 Close Price Chart")
 st.line_chart(df['close'])
 
 # Buy Signals
-buy_df = df[df['buy_signal']].copy()
 st.success("✅ Buy Signals Detected:")
+buy_df = df[df['buy_signal']].copy()
 if not buy_df.empty:
     st.dataframe(buy_df[['open', 'close', 'volume']])
 else:
     st.write("No buy signals found.")
 
 # Sell Signals
-sell_df = df[df['sell_signal']].copy()
 st.error("🔻 Sell Signals Detected:")
+sell_df = df[df['sell_signal']].copy()
 if not sell_df.empty:
     st.dataframe(sell_df[['open', 'close', 'volume']])
 else:
     st.write("No sell signals found.")
 
-# Debug
+# Debug Data
 with st.expander("🛠 Full Data (Debug Info)"):
     st.dataframe(df)
-    streamlit run app.py
-
