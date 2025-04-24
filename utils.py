@@ -1,27 +1,49 @@
+import yfinance as yf
 import pandas as pd
+import ta
 
-def calculate_ema(df: pd.DataFrame, period: int = 50) -> pd.DataFrame:
-    if 'Close' not in df:
-        raise ValueError("Missing 'Close' column for EMA calculation.")
-    df[f'EMA{period}'] = df['Close'].ewm(span=period, adjust=False).mean()
-    return df
+# 🔧 SETTINGS
+tickers = [
+    "RELIANCE.NS", "TCS.NS", "ICICIBANK.NS", "SBIN.NS", 
+    "HDFCBANK.NS", "LT.NS", "INFY.NS", "AXISBANK.NS"
+]
 
-def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
-    if 'Close' not in df:
-        raise ValueError("Missing 'Close' column for RSI calculation.")
-    delta = df['Close'].diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
+timeframe = "15m"  # Options: '1d', '1h', '15m', '5m', etc.
+period = "5d"      # Options: '1mo', '5d', '7d', '60d', etc.
 
-    avg_gain = gain.rolling(window=period).mean()
-    avg_loss = loss.rolling(window=period).mean()
+# 🚀 Screener logic
+def fetch_and_screen(ticker):
+    df = yf.download(ticker, interval=timeframe, period=period, progress=False)
+    if df.empty or len(df) < 50:
+        return None
 
-    rs = avg_gain / avg_loss
-    df['RSI'] = 100 - (100 / (1 + rs))
-    return df
+    df['EMA50'] = ta.trend.ema_indicator(df['Close'], 50)
+    df['EMA200'] = ta.trend.ema_indicator(df['Close'], 200)
+    df['RSI'] = ta.momentum.RSIIndicator(df['Close'], 14).rsi()
+    df['VolumeSMA'] = df['Volume'].rolling(20).mean()
+    
+    latest = df.iloc[-1]
 
-def calculate_avg_volume(df: pd.DataFrame, window: int = 10) -> pd.DataFrame:
-    if 'Volume' not in df:
-        raise ValueError("Missing 'Volume' column for avg volume calculation.")
-    df[f'{window}_avg_vol'] = df['Volume'].rolling(window=window).mean()
-    return df
+    conditions = [
+        latest['Close'] > latest['EMA50'] > latest['EMA200'],
+        latest['RSI'] > 55,
+        latest['Volume'] > 1.5 * latest['VolumeSMA'],
+        latest['Close'] >= 0.98 * latest['High']
+    ]
+
+    return ticker.replace(".NS", "") if all(conditions) else None
+
+# 🔍 Run screener
+candidates = []
+for ticker in tickers:
+    try:
+        result = fetch_and_screen(ticker)
+        if result:
+            candidates.append(result)
+    except Exception as e:
+        print(f"Error with {ticker}: {e}")
+
+# 📢 Result
+print(f"📊 Timeframe: {timeframe}, Period: {period}")
+print("🔥 Matching Stocks:")
+print("\n".join(candidates) if candidates else "No matches.")
