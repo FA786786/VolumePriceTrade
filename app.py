@@ -1,81 +1,69 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import ta
+import numpy as np
+import talib
 
-st.set_page_config(page_title="Stock Screener", layout="wide")
+st.set_page_config(page_title="Indian Stock Screener", layout="wide")
 
-st.title("📈 Indian Stock Screener with Buy/Sell Alerts")
+st.markdown("""
+    <h1 style='text-align: center;'>📊 Indian Stock Screener with Buy/Sell Alerts</h1>
+""", unsafe_allow_html=True)
 
-# Sidebar settings
+# Sidebar filters
 st.sidebar.header("Filter Settings")
-rsi_threshold = st.sidebar.slider("RSI Buy Threshold", 50, 80, 55)
+rsi_buy_threshold = st.sidebar.slider("RSI Buy Threshold", 50, 80, 60)
 volume_multiplier = st.sidebar.slider("Volume Multiplier", 1.0, 3.0, 1.5)
-timeframe = st.sidebar.selectbox("Timeframe", ["1d", "1h", "15m"], index=0)
-period_map = {"1d": "3mo", "1h": "30d", "15m": "5d"}
-period = period_map[timeframe]
+timeframe = st.sidebar.selectbox("Timeframe", ["1d", "1h", "15m"])
 
-# List of tickers
-tickers = {
-    "RELIANCE.NS": "Reliance",
-    "TCS.NS": "TCS",
-    "INFY.NS": "Infosys",
-    "HDFCBANK.NS": "HDFC Bank",
-    "ICICIBANK.NS": "ICICI Bank",
-    "SBIN.NS": "SBI",
-    "AXISBANK.NS": "Axis Bank",
-    "LT.NS": "L&T"
-}
+# List of stock tickers
+tickers = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "AXISBANK.NS"]
 
 results = []
 
-for symbol, name in tickers.items():
+st.markdown("### Screener Results")
+
+for ticker in tickers:
     try:
-        df = yf.download(symbol, interval=timeframe, period=period)
-        if df.empty or "Close" not in df.columns:
+        df = yf.download(ticker, period="6mo", interval=timeframe)
+        if df.empty:
+            st.error(f"No data for {ticker}")
             continue
 
-        close = df["Close"]
-        volume = df["Volume"]
-
-        df["EMA50"] = ta.trend.ema_indicator(close=close, window=50).ema_indicator()
-        df["EMA200"] = ta.trend.ema_indicator(close=close, window=200).ema_indicator()
-        df["RSI"] = ta.momentum.RSIIndicator(close=close, window=14).rsi()
-        df["VolumeSMA"] = volume.rolling(window=20).mean()
         df.dropna(inplace=True)
 
-        last = df.iloc[-1]
+        close = df['Close'].values
+        volume = df['Volume'].values
 
-        is_buy = (
-            last["Close"] > last["EMA50"] > last["EMA200"]
-            and last["RSI"] > rsi_threshold
-            and last["Volume"] > last["VolumeSMA"] * volume_multiplier
-        )
+        # Flatten the arrays for indicators
+        rsi = talib.RSI(close).flatten()
+        avg_volume = pd.Series(volume).rolling(window=14).mean().values.flatten()
 
-        is_sell = (
-            last["Close"] < last["EMA50"] < last["EMA200"]
-            and last["RSI"] < 40
-        )
+        latest_rsi = rsi[-1]
+        latest_volume = volume[-1]
+        avg_volume_14 = avg_volume[-1]
 
-        signal = "Buy 📈" if is_buy else "Sell 📉" if is_sell else ""
+        signal = ""
+        if latest_rsi < rsi_buy_threshold and latest_volume > avg_volume_14 * volume_multiplier:
+            signal = "BUY"
 
-        if signal:
-            results.append({
-                "Stock": name,
-                "Symbol": symbol,
-                "Close": round(last["Close"], 2),
-                "RSI": round(last["RSI"], 2),
-                "Volume": int(last["Volume"]),
-                "Signal": signal
-            })
+        results.append({
+            "Ticker": ticker,
+            "RSI": round(latest_rsi, 2),
+            "Volume": int(latest_volume),
+            "Avg Volume (14d)": int(avg_volume_14),
+            "Signal": signal
+        })
 
     except Exception as e:
-        st.error(f"Error fetching data for {symbol}: {e}")
+        st.error(f"Error fetching data for {ticker}: {e}")
 
-st.subheader("📋 Screener Results")
-if results:
-    df_result = pd.DataFrame(results)
-    st.dataframe(df_result)
-    st.download_button("Download Results as CSV", df_result.to_csv(index=False), "screener_results.csv")
+# Convert results to dataframe
+results_df = pd.DataFrame(results)
+
+if not results_df.empty:
+    st.dataframe(results_df)
+    csv = results_df.to_csv(index=False).encode('utf-8')
+    st.download_button("Download Results as CSV", csv, "screener_results.csv", "text/csv")
 else:
-    st.info("No stocks matched the current filter criteria.")
+    st.info("No matching stocks found with current filters.")
