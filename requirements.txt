@@ -1,6 +1,4 @@
-
-
-streamlit
+ta
 yfinance
 pandas
-ta
+streamlit
