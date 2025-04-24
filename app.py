@@ -6,11 +6,11 @@ import ta
 st.set_page_config(layout="wide")
 st.title("📊 Volume, Price, Trade Screener")
 
-# Filters
+# --- Screener Settings ---
 rsi_threshold = st.slider("RSI Threshold", 50, 80, 55)
 volume_multiplier = st.slider("Volume Multiplier", 1.0, 3.0, 1.5)
 
-# List of stocks to screen
+# --- Stock List (Ticker: Name) ---
 stock_list = {
     "RELIANCE.NS": "Reliance Industries",
     "TCS.NS": "Tata Consultancy Services",
@@ -23,58 +23,69 @@ stock_list = {
 
 results = []
 
+# --- Screener Logic ---
 for ticker, name in stock_list.items():
     try:
         df = yf.download(ticker, period="6mo", interval="1d")
-        if df.empty or len(df) < 200:
+        
+        # Fix: Ensure data is not empty
+        if df.empty or len(df) < 100:
+            st.warning(f"{ticker} skipped: Not enough data.")
             continue
 
-        df.dropna(inplace=True)
+        df = df.dropna()
 
         # Indicators
-        df['EMA50'] = ta.trend.EMAIndicator(df['Close'], window=50).ema_indicator().to_numpy().flatten()
-        df['EMA200'] = ta.trend.EMAIndicator(df['Close'], window=200).ema_indicator().to_numpy().flatten()
-        df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi().to_numpy().flatten()
+        df['EMA50'] = ta.trend.EMAIndicator(close=df['Close'], window=50).ema_indicator()
+        df['EMA200'] = ta.trend.EMAIndicator(close=df['Close'], window=200).ema_indicator()
+        df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
         df['VolumeSMA'] = df['Volume'].rolling(window=20).mean()
 
         df.dropna(inplace=True)
-        latest = df.iloc[-1]
 
-        # Conditions
-        price_above_ema50 = latest['Close'] > latest['EMA50']
-        price_above_ema200 = latest['Close'] > latest['EMA200']
-        rsi_ok = latest['RSI'] > rsi_threshold
-        volume_ok = latest['Volume'] > (latest['VolumeSMA'] * volume_multiplier)
-
-        if price_above_ema50 and price_above_ema200 and rsi_ok and volume_ok:
-            signal = "📈 Buy"
-        elif latest['Close'] < latest['EMA50'] and latest['Close'] < latest['EMA200'] and latest['RSI'] < 40:
-            signal = "📉 Sell"
-        else:
+        if df.empty:
+            st.warning(f"{ticker} skipped: No valid rows after indicators.")
             continue
 
-        results.append({
-            "Stock Name": name,
-            "Ticker": ticker,
-            "Close": round(latest['Close'], 2),
-            "RSI": round(latest['RSI'], 2),
-            "Volume": int(latest['Volume']),
-            "Avg Volume": int(latest['VolumeSMA']),
-            "Signal": signal
-        })
+        latest = df.iloc[-1]
+
+        # Signal Conditions
+        buy_cond = (
+            latest['Close'] > latest['EMA50'] and
+            latest['Close'] > latest['EMA200'] and
+            latest['RSI'] > rsi_threshold and
+            latest['Volume'] > latest['VolumeSMA'] * volume_multiplier
+        )
+
+        sell_cond = (
+            latest['Close'] < latest['EMA50'] and
+            latest['Close'] < latest['EMA200'] and
+            latest['RSI'] < 40
+        )
+
+        signal = "📈 Buy" if buy_cond else "📉 Sell" if sell_cond else None
+
+        if signal:
+            results.append({
+                "Stock Name": name,
+                "Ticker": ticker,
+                "Close": round(latest['Close'], 2),
+                "RSI": round(latest['RSI'], 2),
+                "Volume": int(latest['Volume']),
+                "Avg Volume": int(latest['VolumeSMA']),
+                "Signal": signal
+            })
 
     except Exception as e:
-        st.warning(f"{ticker} error: {e}")
+        st.error(f"{ticker} error: {e}")
 
-# Show results
+# --- Display Results ---
 st.markdown("## 📈 Screener Results")
 if results:
     df_result = pd.DataFrame(results)
     st.dataframe(df_result)
 
-    # Optional CSV download
     csv = df_result.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Download Results as CSV", data=csv, file_name="screener_results.csv", mime="text/csv")
-
 else:
     st.info("No matching stocks found with current filters.")
