@@ -1,43 +1,49 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
+import ta  # This is the 'ta' library, not pandas_ta
 
-st.title("📊 Indian Stock Screener with Buy/Sell Alerts")
+# Title
+st.title("📊 Indian Stock Screener (RSI + Volume)")
 
-stocks = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS"]
+# Stock List
+stocks = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS"]
 
-# Sidebar filters
-rsi_threshold = st.sidebar.slider("RSI Buy Threshold", 50, 80, 60)
-volume_multiplier = st.sidebar.slider("Volume Multiplier", 1.0, 3.0, 1.5)
-timeframe = st.sidebar.selectbox("Timeframe", ["1d", "1h", "15m"])
+# Sidebar controls
+rsi_buy_threshold = st.sidebar.slider("RSI Buy Threshold", 50, 80, 60)
+volume_ratio = st.sidebar.slider("Volume > x times average", 1.0, 3.0, 1.5)
+interval = st.sidebar.selectbox("Interval", ["1d", "1h", "15m"])
+period = st.sidebar.selectbox("Period", ["7d", "30d", "60d", "90d"], index=1)
 
 @st.cache_data
-def fetch_data(ticker, interval):
-    df = yf.download(ticker, period="90d", interval=interval)
+def fetch_data(ticker, interval, period):
+    df = yf.download(ticker, interval=interval, period=period)
     if df.empty:
         return None
-    df.ta.rsi(length=14, append=True)
-    df["VolumeAvg"] = df["Volume"].rolling(window=20).mean()
+    df["RSI"] = ta.momentum.RSIIndicator(df["Close"], window=14).rsi()
+    df["Vol_Avg"] = df["Volume"].rolling(20).mean()
     return df
 
 results = []
 
 for stock in stocks:
-    df = fetch_data(stock, timeframe)
-    if df is None or "RSI_14" not in df.columns:
-        continue
-    latest = df.iloc[-1]
-    if latest["RSI_14"] < rsi_threshold and latest["Volume"] > volume_multiplier * latest["VolumeAvg"]:
-        results.append({
-            "Stock": stock,
-            "RSI": round(latest["RSI_14"], 2),
-            "Volume": int(latest["Volume"]),
-            "VolumeAvg": int(latest["VolumeAvg"])
-        })
+    df = fetch_data(stock, interval, period)
+    if df is not None and not df.empty:
+        last = df.iloc[-1]
+        if (
+            last["RSI"] < rsi_buy_threshold and
+            last["Volume"] > volume_ratio * last["Vol_Avg"]
+        ):
+            results.append({
+                "Stock": stock,
+                "RSI": round(last["RSI"], 2),
+                "Volume": int(last["Volume"]),
+                "Avg Volume": int(last["Vol_Avg"])
+            })
 
+# Display results
 if results:
-    st.subheader("📈 Screener Results")
+    st.subheader("📈 Stocks Matching Criteria")
     st.dataframe(pd.DataFrame(results))
 else:
-    st.info("No matching stocks found with current filters.")
+    st.info("No stocks matched the current filters.")
