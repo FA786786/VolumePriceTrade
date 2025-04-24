@@ -10,14 +10,14 @@ st.title("📊 Volume, Price, Trade Screener")
 rsi_threshold = st.slider("RSI Threshold", 50, 80, 55)
 volume_multiplier = st.slider("Volume Multiplier", 1.0, 3.0, 1.5)
 
-# --- Stock List (Ticker: Name) ---
+# --- Stock List ---
 stock_list = {
-    "RELIANCE.NS": "Reliance Industries",
-    "TCS.NS": "Tata Consultancy Services",
+    "RELIANCE.NS": "Reliance",
+    "TCS.NS": "TCS",
     "INFY.NS": "Infosys",
     "HDFCBANK.NS": "HDFC Bank",
     "ICICIBANK.NS": "ICICI Bank",
-    "SBIN.NS": "State Bank of India",
+    "SBIN.NS": "SBI",
     "AXISBANK.NS": "Axis Bank"
 }
 
@@ -28,42 +28,37 @@ for ticker, name in stock_list.items():
     try:
         df = yf.download(ticker, period="6mo", interval="1d")
         
-        # Fix: Ensure data is not empty
         if df.empty or len(df) < 100:
             st.warning(f"{ticker} skipped: Not enough data.")
             continue
 
-        df = df.dropna()
+        df.dropna(inplace=True)
 
-        # Indicators
-        df['EMA50'] = ta.trend.EMAIndicator(close=df['Close'], window=50).ema_indicator()
-        df['EMA200'] = ta.trend.EMAIndicator(close=df['Close'], window=200).ema_indicator()
+        # ✅ Use Series (1D), NOT DataFrame (2D)
+        df['EMA50'] = ta.trend.ema_indicator(close=df['Close'], window=50)
+        df['EMA200'] = ta.trend.ema_indicator(close=df['Close'], window=200)
         df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
         df['VolumeSMA'] = df['Volume'].rolling(window=20).mean()
 
         df.dropna(inplace=True)
 
-        if df.empty:
-            st.warning(f"{ticker} skipped: No valid rows after indicators.")
-            continue
-
         latest = df.iloc[-1]
 
         # Signal Conditions
-        buy_cond = (
+        buy = (
             latest['Close'] > latest['EMA50'] and
             latest['Close'] > latest['EMA200'] and
             latest['RSI'] > rsi_threshold and
             latest['Volume'] > latest['VolumeSMA'] * volume_multiplier
         )
 
-        sell_cond = (
+        sell = (
             latest['Close'] < latest['EMA50'] and
             latest['Close'] < latest['EMA200'] and
             latest['RSI'] < 40
         )
 
-        signal = "📈 Buy" if buy_cond else "📉 Sell" if sell_cond else None
+        signal = "📈 Buy" if buy else "📉 Sell" if sell else None
 
         if signal:
             results.append({
