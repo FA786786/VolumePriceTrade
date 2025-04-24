@@ -1,42 +1,54 @@
-import streamlit as st
-import yfinance as yf
 import pandas as pd
-from strategy import analyze_stock
+import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Volume Threshold Strategy", layout="wide")
-st.title("BankNifty Volume Strategy (19880+)")
+# === PARAMETERS ===
+volume_threshold = 19880
 
-st.markdown("This strategy triggers **Buy** on high-volume green candles and **Sell** on high-volume red candles. Volume threshold: `19880`")
+# === EXAMPLE DATA ===
+# Replace this with your real OHLCV data
+# DataFrame `df` should contain columns: ['open', 'high', 'low', 'close', 'volume']
+# Example:
+# df = pd.read_csv('your_data.csv')
 
-# Sidebar inputs
-ticker = st.sidebar.text_input("Enter NSE Symbol", value="^NSEBANK")  # BankNifty index
-start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2022-01-01"))
-end_date = st.sidebar.date_input("End Date", pd.to_datetime("today"))
-run_button = st.sidebar.button("Run Strategy")
+# Sample structure for context
+df = pd.DataFrame({
+    'open': [100, 102, 101, 105],
+    'high': [105, 106, 103, 110],
+    'low': [99, 100, 100, 104],
+    'close': [104, 101, 102, 108],
+    'volume': [20000, 15000, 22000, 25000]
+})
 
-if run_button:
-    try:
-        # Fetch data
-        st.write(f"Fetching data for: {ticker}")
-        df = yf.download(ticker, start=start_date, end=end_date, progress=False)
+# === CANDLE CONDITIONS ===
+df['is_bullish'] = df['close'] > df['open']
+df['is_bearish'] = df['close'] < df['open']
+df['is_high_volume'] = df['volume'] >= volume_threshold
 
-        if df.empty:
-            st.error("No data found for the selected symbol and time range.")
-        elif not all(col in df.columns for col in ['Open', 'Close', 'Volume', 'High']):
-            st.error("Downloaded data is missing required columns: Open, Close, Volume, High.")
-            st.dataframe(df.head())  # Optional: show what was downloaded
-        else:
-            # Run strategy logic
-            df_result, signal_df = analyze_stock(df)
+# === SIGNAL CONDITIONS ===
+df['buy_signal'] = df['is_bullish'] & df['is_high_volume']
+df['sell_signal'] = df['is_bearish'] & df['is_high_volume']
 
-            st.subheader("Price Chart")
-            st.line_chart(df_result["Close"])
+# === PLOTTING ===
+plt.figure(figsize=(12, 6))
+plt.plot(df['close'], label='Close Price', color='black')
 
-            st.subheader("Signals")
-            if signal_df.empty:
-                st.info("No Buy/Sell signals found for this period.")
-            else:
-                st.dataframe(signal_df)
+# Buy signals
+plt.scatter(df.index[df['buy_signal']], df['low'][df['buy_signal']] - 1, color='green', marker='^', label='Buy Signal')
 
-    except Exception as e:
-        st.error(f"Error while running strategy: {e}")
+# Sell signals
+plt.scatter(df.index[df['sell_signal']], df['high'][df['sell_signal']] + 1, color='red', marker='v', label='Sell Signal')
+
+# === OPTIONAL: Show volume for alerts/debug ===
+# plt.bar(df.index, df['volume'], alpha=0.3, color='orange', label='Volume')
+
+# === LABELS (printout for debug/alerts) ===
+for idx, row in df.iterrows():
+    if row['buy_signal']:
+        print(f"{idx}: BUY - Volume: {row['volume']}")
+    elif row['sell_signal']:
+        print(f"{idx}: SELL - Volume: {row['volume']}")
+
+plt.title('BankNifty Volume Buy/Sell Signals')
+plt.legend()
+plt.grid(True)
+plt.show()
