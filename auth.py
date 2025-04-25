@@ -1,18 +1,9 @@
-import streamlit as st
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-def get_api_keys():
-    return {
-        "api_key": st.secrets["api"]["api_key"],
-        "secret": st.secrets["api"]["secret"]
-    }
-
-def generate_login_url():
-    return "https://example.com/login"
-
-def exchange_token(auth_code):
-    # Dummy logic, replace with real API call
-    return "access_token_based_on_" + auth_code
-
-def update_access_token(refresh_token):
-    # Dummy logic, replace with real API call
-    return "new_access_token_based_on_" + refresh_token
+def get_google_sheet(sheet_url, json_keyfile_dict):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(json_keyfile_dict, scope)
+    client = gspread.authorize(creds)
+    sheet = client.open_by_url(sheet_url)
+    return sheet
