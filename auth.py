@@ -14,3 +14,10 @@ def exchange_token():
 
 def update_access_token():
     return True
+import streamlit as st
+
+def get_api_keys():
+    return {
+        "api_key": st.secrets["api"]["api_key"],
+        "secret": st.secrets["api"]["secret"]
+    }
