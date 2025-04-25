@@ -11,5 +11,11 @@ from auth import (
     update_access_token,
 )
 
-st.title("Streamlit App")
-st.write("Hello world")
+st.set_page_config(page_title="Volume Price Trade App")
+
+st.title("📈 Volume Price Trade App")
+
+# Dummy usage example
+st.write("Google Sheet:", get_google_sheet())
+st.write("API Keys:", get_keys_from_sheet())
+st.write("Login URL:", generate_login_url())
