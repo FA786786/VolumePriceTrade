@@ -1,21 +1,7 @@
-# app.py
-
-import os
 import streamlit as st
+import json
+from auth import get_google_sheet
 
-from auth import (
-    get_google_sheet,
-    get_keys_from_sheet,
-    generate_login_url,
-    exchange_token,
-    update_access_token,
-)
-
-st.set_page_config(page_title="Volume Price Trade App")
-
-st.title("📈 Volume Price Trade App")
-
-# Dummy usage example
-st.write("Google Sheet:", get_google_sheet())
-st.write("API Keys:", get_keys_from_sheet())
-st.write("Login URL:", generate_login_url())
+json_key = st.secrets["google_sheets"]
+sheet_url = "https://docs.google.com/spreadsheets/d/your_sheet_id_here"
+sheet = get_google_sheet(sheet_url, json_key)
